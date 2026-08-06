@@ -1,0 +1,19 @@
+import { Request, Response } from 'express';
+export declare const createRoom: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const listRooms: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const getRoom: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const joinRoom: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const leaveRoom: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const updateRoom: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const startGame: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const getGameState: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const getGameEvents: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const rollDice: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const movePlayer: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const suggest: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const reveal: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const accuse: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const endTurn: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const sendChatMessage: (req: Request, res: Response, next: import("express").NextFunction) => void;
+export declare const getChatHistory: (req: Request, res: Response, next: import("express").NextFunction) => void;
+//# sourceMappingURL=game.controller.d.ts.map

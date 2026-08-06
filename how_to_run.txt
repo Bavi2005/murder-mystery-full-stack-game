@@ -1,0 +1,275 @@
+============================================================================
+  MYSTERY MANSION - HOW TO RUN (FIRST-TIME GUIDE)
+============================================================================
+  A live multiplayer murder mystery game.
+  Stack: React (Vite) + Node/Express (TypeScript) + PostgreSQL + Redis.
+
+  This guide covers two ways to run:
+    A) Easiest:  Docker Compose (everything in containers)
+    B) Dev mode:  Postgres + Redis in Docker, app run locally (hot reload)
+
+============================================================================
+0. PREREQUISITES
+============================================================================
+  - Docker + Docker Compose         (https://www.docker.com/get-started)
+  - Node.js >= 20                   (check: node --version)
+  - npm                             (check: npm --version)
+  - A terminal with bash/zsh
+
+  Verify quickly:
+      docker --version
+      docker compose version
+      node --version
+
+---------------------------------------------------------------------------
+0a. INSTALL DOCKER NATIVELY IN WSL/UBUNTU (if "docker: command not found")
+---------------------------------------------------------------------------
+  Run these with sudo (Ubuntu/Debian). You only need ONE of the two
+  options below - the quick apt version is the simplest.
+
+  OPTION A - Quick install (simpler, slightly older Docker):
+
+      sudo apt-get update
+      sudo apt-get install -y docker.io docker-compose-v2
+
+      # give your user permission to run docker without sudo:
+      sudo usermod -aG docker $USER
+
+      # start the docker daemon (WSL has no systemd by default):
+      sudo service docker start
+
+      # check it works:
+      docker --version
+      docker compose version
+
+      # (if you get a permission error, close and reopen the terminal
+      #  so the docker group change takes effect, then retry)
+
+  OPTION B - Docker Desktop WSL integration (if you have Docker Desktop):
+      Open Docker Desktop -> Settings -> Resources -> WSL Integration,
+      enable your distro, then in WSL:
+          docker --version
+      (no packages to install in WSL itself)
+
+---------------------------------------------------------------------------
+0b. INSTALL POSTGRESQL + REDIS NATIVELY IN WSL
+---------------------------------------------------------------------------
+  If you are NOT using Docker for the database, install them directly:
+
+      sudo apt-get update
+      sudo apt-get install -y postgresql redis-server
+
+      # start them (WSL has no systemd by default):
+      sudo service postgresql start
+      sudo service redis-server start
+
+      # set a password for the postgres user and create the app database:
+      sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+      sudo -u postgres psql -c "CREATE DATABASE transcendence;"
+
+      # then update backend/.env -> DATABASE_URL=
+      #   postgresql://postgres:postgres@localhost:5432/transcendence?schema=public
+      # (or use the transcendence/transcendence_secure_2024 user below)
+
+  RECOMMENDED MATCHING SETUP (user/pass/db all match .env.example):
+
+      sudo -u postgres psql -c "CREATE USER transcendence WITH PASSWORD 'transcendence_secure_2024';"
+      sudo -u postgres psql -c "CREATE DATABASE transcendence OWNER transcendence;"
+
+      # seed types/extensions (same as init.sql does in Docker):
+      psql "postgresql://transcendence:transcendence_secure_2024@localhost:5432/transcendence" -f backend/prisma/init.sql
+
+      # create the tables (init.sql only defines types/extensions; the
+      # actual tables come from the Prisma schema - there are no migration
+      # files, so use "db push" to sync them):
+      cd backend && npx prisma db push
+
+      # that's it - backend/.env.example already matches these credentials
+
+  IMPORTANT - "permission denied for schema public" errors?
+      It means the 'transcendence' database was created WITHOUT the OWNER
+      clause (owned by 'postgres'), so 'transcendence' cannot create
+      types/extensions (Postgres 15+ blocks non-owners). Fix by dropping
+      and recreating the database with the right owner, then re-seed:
+
+      sudo -u postgres psql -c "DROP DATABASE transcendence;"
+      sudo -u postgres psql -c "CREATE DATABASE transcendence OWNER transcendence;"
+      psql "postgresql://transcendence:transcendence_secure_2024@localhost:5432/transcendence" -f backend/prisma/init.sql
+      cd backend && npx prisma db push   # re-sync tables after recreating the DB
+
+============================================================================
+1. GET THE ENV FILES READY (IMPORTANT - DO NOT SKIP)
+============================================================================
+  The backend REQUIRES a DATABASE_URL, otherwise it crashes on startup with:
+
+      PrismaClientInitializationError: Environment variable not found: DATABASE_URL
+
+  Create the env files (copy the examples provided):
+
+      cp backend/.env.example backend/.env
+      cp frontend/.env.example frontend/.env
+
+  Defaults in the examples already match the Docker Compose credentials
+  (user: transcendence / pass: transcendence_secure_2024 / db: transcendence),
+  so you can run immediately. Change secrets before any real deployment.
+
+============================================================================
+2. START THE DATABASE + REDIS (REQUIRED IN BOTH MODES)
+============================================================================
+  From the project root (/home/bpichyal/work/ft_transcendence):
+
+      docker compose up -d postgres redis
+
+  This starts:
+      - PostgreSQL 16  on localhost:5432  (db: transcendence)
+      - Redis 7        on localhost:6379  (password: redis_secure_2024)
+
+  NOTE: The first time Postgres starts, it auto-runs
+  backend/prisma/init.sql (mounts into /docker-entrypoint-initdb.d),
+  which creates the schema types/tables. No manual migration is needed.
+
+  Check everything is healthy:
+
+      docker compose ps
+
+  You should see both containers with status "healthy".
+  (The backend will not start until Postgres is ready.)
+
+============================================================================
+3A. RUN THE FULL STACK WITH DOCKER (PRODUCTION-STYLE)
+============================================================================
+  From the project root:
+
+      docker compose up --build
+
+  This builds and starts: backend (port 3001), frontend+nginx (ports 80/443).
+
+  NOTE: The docker-compose.yml references ./nginx/nginx.conf and
+  ./frontend/Dockerfile. If those files are missing, create them or use
+  the dev mode (3B) below instead. If you get "build failed: cannot find
+  Dockerfile" or "no such file or directory: nginx/nginx.conf", use 3B.
+
+  Stop everything:
+
+      docker compose down
+
+  Wipe the database too (fresh start):
+
+      docker compose down -v
+
+============================================================================
+3B. RUN IN DEV MODE (HOT RELOAD, RECOMMENDED FOR DEVELOPMENT)
+============================================================================
+  Step 1 - Start the database and Redis (one time, keep it running):
+
+      docker compose up -d postgres redis          # Docker option
+      #  OR start natively if no Docker:
+      #     sudo service postgresql start
+      #     sudo service redis-server start
+
+  Step 2 - Backend (terminal #1):
+
+      cd backend
+      cp .env.example .env        # first time only
+      npm install
+      npx prisma generate         # generates Prisma Client from schema
+      npm run dev                 # starts on http://localhost:3001
+
+  You should see logs like:
+      "Database connected"
+      "Server running on port 3001 in development mode"
+
+  Health check in another terminal:
+      curl http://localhost:3001/health
+      -> {"success":true,"status":"healthy",...}
+
+  Step 3 - Frontend (terminal #2):
+
+      cd frontend
+      cp .env.example .env        # first time only
+      npm install
+      npm run dev                 # starts on http://localhost:3000
+
+  Step 4 - Open the app:
+      Browser -> http://localhost:3000
+      (The Vite dev server proxies /api and /ws to the backend on :3001,
+       so no CORS issues in dev.)
+
+============================================================================
+4. WHAT SHOULD WORK AFTER STARTUP
+============================================================================
+  - Frontend:  http://localhost:3000     (React app)
+  - Backend:   http://localhost:3001/api (Express API)
+  - Health:    http://localhost:3001/health
+  - Register an account, log in, create/join a room, play a game.
+
+============================================================================
+5. USEFUL COMMANDS
+============================================================================
+  Backend (from backend/):
+      npm run dev              dev server with auto-reload
+      npm run build            compile TypeScript -> dist/
+      npm start                run compiled dist/index.js
+      npm test                 run unit tests (vitest)
+      npm run lint             lint the source
+      npx prisma studio        GUI browser for the database (needs .env)
+      npx prisma generate      (re)generate the Prisma client
+
+  Frontend (from frontend/):
+      npm run dev              Vite dev server on :3000
+      npm run build            type-check + production build -> dist/
+      npm run preview          preview the production build
+      npm test                 run unit tests
+
+  Docker (from project root):
+      docker compose ps                 see running containers
+      docker compose logs backend       backend logs
+      docker compose down               stop everything
+      docker compose down -v            stop and delete DB data
+
+============================================================================
+6. TROUBLESHOOTING
+============================================================================
+  ERROR: "PrismaClientInitializationError: Environment variable not
+  found: DATABASE_URL"
+      -> You forgot backend/.env. Run: cp backend/.env.example backend/.env
+
+  ERROR: "Could not find Prisma Schema ... schema.prisma: file not found"
+      -> You ran npx prisma generate from the wrong folder.
+         Run it from backend/ (where prisma/schema.prisma lives).
+
+  ERROR: "ECONNREFUSED 127.0.0.1:5432" or "connection refused"
+      -> Postgres is not running. Start it:
+           Docker:    docker compose up -d postgres
+           Native:    sudo service postgresql start
+         then wait ~5s and check: docker compose ps
+
+  ERROR: Redis "ERR Client sent AUTH, but no password is set"
+      -> REDIS_PASSWORD mismatch. Keep the defaults in .env
+         (redis_secure_2024) or change BOTH docker-compose.yml and .env.
+         NOTE: the backend currently configures Redis but does not actually
+         connect to it, so Redis is optional for running the app.
+
+  ERROR: port 5432/6379 already in use (both native and Docker DBs started)
+      -> You installed Postgres/Redis natively AND via Docker. Pick ONE:
+           Native:  sudo service postgresql stop  (undo Docker conflict)
+                    then: sudo service postgresql start
+           Docker:  sudo service postgresql stop  ;  docker compose up -d postgres redis
+         Only one service may bind to 5432 and 6379 at a time.
+
+  Backend crashes with "Failed to start server" - check the DB is up:
+      docker compose ps        (postgres must be "healthy")
+
+  Ports already in use (3000/3001/5432/6379):
+      Find the offender:  ss -ltnp | grep -E '3000|3001|5432|6379'
+      Stop it or change PORT in backend/.env (and VITE proxy in
+      frontend/vite.config.ts).
+
+  npm install gives vulnerability warnings:
+      Optional. Check them with: npm audit
+      Do NOT blindly run: npm audit fix --force
+      (it upgrades to breaking major versions, e.g. vitest 1 -> 4)
+
+============================================================================
+  That's it. Happy investigating!
+============================================================================

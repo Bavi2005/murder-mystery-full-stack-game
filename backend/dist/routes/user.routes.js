@@ -1,0 +1,24 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.userRouter = void 0;
+const express_1 = require("express");
+const auth_1 = require("../middleware/auth");
+const validation_1 = require("../middleware/validation");
+const user_controller_1 = require("../controllers/user.controller");
+const validators_1 = require("../validators");
+exports.userRouter = (0, express_1.Router)();
+exports.userRouter.use(auth_1.authenticate);
+exports.userRouter.get('/profile', user_controller_1.getProfile);
+exports.userRouter.put('/profile', user_controller_1.updateProfile);
+exports.userRouter.get('/stats', user_controller_1.getGameStats);
+exports.userRouter.post('/friends/request', (0, validation_1.validate)(validators_1.friendRequestSchema), user_controller_1.sendFriendRequest);
+exports.userRouter.post('/friends/:requestId/accept', (0, validation_1.validate)(validators_1.friendActionSchema), user_controller_1.acceptFriendRequest);
+exports.userRouter.post('/friends/:requestId/reject', (0, validation_1.validate)(validators_1.friendActionSchema), user_controller_1.rejectFriendRequest);
+exports.userRouter.delete('/friends/:friendId', user_controller_1.removeFriend);
+exports.userRouter.get('/friends', user_controller_1.getFriends);
+exports.userRouter.get('/notifications', user_controller_1.getNotifications);
+exports.userRouter.post('/notifications/:notificationId/read', (0, validation_1.validate)(validators_1.notificationSchema), user_controller_1.markNotificationRead);
+exports.userRouter.post('/notifications/read-all', user_controller_1.markAllNotificationsRead);
+exports.userRouter.get('/search', user_controller_1.searchUsers);
+exports.userRouter.get('/leaderboard', user_controller_1.getLeaderboard);
+//# sourceMappingURL=user.routes.js.map

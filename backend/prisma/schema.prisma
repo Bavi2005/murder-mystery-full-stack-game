@@ -1,0 +1,263 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  username         String    @unique
+  passwordHash     String    @map("password_hash")
+  avatarUrl        String?   @map("avatar_url")
+  displayName      String?   @map("display_name")
+  bio              String?
+  isOnline         Boolean   @default(false) @map("is_online")
+  isBot            Boolean   @default(false) @map("is_bot")
+  lastSeen         DateTime? @map("last_seen")
+  twoFactorEnabled Boolean   @default(false) @map("two_factor_enabled")
+  twoFactorSecret  String?   @map("two_factor_secret")
+  failedLoginAttempts Int    @default(0) @map("failed_login_attempts")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  gamesPlayed       GamePlayer[]
+  hostedGames       Game[]          @relation("HostedGames")
+  sentRequests      FriendRequest[] @relation("SentRequests")
+  receivedRequests  FriendRequest[] @relation("ReceivedRequests")
+  chatMessages      ChatMessage[]
+  gameStats         GameStats?
+  notifications     Notification[]
+  sessions          Session[]
+  oauthAccounts     OAuthAccount[]
+  passwordResets    PasswordResetToken[]
+
+  @@index([email])
+  @@index([username])
+  @@index([isOnline])
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  refreshToken String   @unique @map("refresh_token")
+  userAgent    String?  @map("user_agent")
+  ipAddress    String?  @map("ip_address")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model OAuthAccount {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  provider     String
+  providerId   String   @map("provider_id")
+  accessToken  String?  @map("access_token")
+  refreshToken String?  @map("refresh_token")
+  expiresAt    DateTime? @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model Game {
+  id                String         @id @default(uuid())
+  name              String
+  hostId            String         @map("host_id")
+  status            GameStatus     @default(WAITING)
+  maxPlayers        Int            @default(6) @map("max_players")
+  settings          Json           @default("{}")
+  // Secret solution envelope, AES-256-GCM encrypted at rest. Never sent to clients until game over.
+  envelope          String?        @map("envelope")
+  // Turn machine state (phase, dice, current player index, pending suggestion)
+  state             Json           @default("{}")
+  winnerId          String?        @map("winner_id")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  startedAt         DateTime?      @map("started_at")
+  endedAt           DateTime?      @map("ended_at")
+
+  host       User         @relation("HostedGames", fields: [hostId], references: [id])
+  players    GamePlayer[]
+  events     GameEvent[]
+  chatMessages ChatMessage[]
+
+  @@index([hostId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("games")
+}
+
+model GamePlayer {
+  id           String   @id @default(uuid())
+  gameId       String   @map("game_id")
+  userId       String   @map("user_id")
+  // Suspect token id (e.g. "miss_scarlet") assigned to this player
+  characterId  String   @map("character_id")
+  // Board node key the token currently stands on
+  position     String   @default("start_scarlet")
+  // Dealt card ids, JSON array of strings. Only visible to the owner.
+  hand         Json     @default("[]")
+  isAlive      Boolean  @default(true) @map("is_alive")
+  disconnected Boolean  @default(false)
+  score        Int      @default(0)
+  joinedAt     DateTime @default(now()) @map("joined_at")
+  leftAt       DateTime? @map("left_at")
+
+  game         Game          @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events       GameEvent[]
+
+  @@unique([gameId, userId])
+  @@index([gameId])
+  @@index([userId])
+  @@map("game_players")
+}
+
+model GameEvent {
+  id        String   @id @default(uuid())
+  gameId    String   @map("game_id")
+  playerId  String?  @map("player_id")
+  // MOVE | ROLL | SUGGEST | REVEAL | ACCUSE | ELIMINATE | WIN | LOSE | SYSTEM
+  type      String
+  data      Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  game   Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player GamePlayer? @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@index([gameId])
+  @@index([createdAt])
+  @@map("game_events")
+}
+
+model ChatMessage {
+  id        String      @id @default(uuid())
+  gameId    String?     @map("game_id")
+  senderId  String      @map("sender_id")
+  receiverId String?    @map("receiver_id")
+  content   String
+  type      MessageType @default(CHAT)
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  game   Game? @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  sender User  @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([gameId])
+  @@index([senderId])
+  @@index([createdAt])
+  @@map("chat_messages")
+}
+
+model FriendRequest {
+  id         String             @id @default(uuid())
+  senderId   String             @map("sender_id")
+  receiverId String             @map("receiver_id")
+  status     FriendRequestStatus @default(PENDING)
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+
+  sender   User @relation("SentRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([receiverId])
+  @@index([status])
+  @@map("friend_requests")
+}
+
+model GameStats {
+  id                  String   @id @default(uuid())
+  userId              String   @unique @map("user_id")
+  gamesPlayed         Int      @default(0) @map("games_played")
+  gamesWon            Int      @default(0) @map("games_won")
+  gamesLost           Int      @default(0) @map("games_lost")
+  totalScore          Int      @default(0) @map("total_score")
+  correctAccusations  Int      @default(0) @map("correct_accusations")
+  wrongAccusations    Int      @default(0) @map("wrong_accusations")
+  cardsSeen           Int      @default(0) @map("cards_seen")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("game_stats")
+}
+
+model Notification {
+  id        String             @id @default(uuid())
+  userId    String             @map("user_id")
+  type      NotificationType
+  title     String
+  message   String
+  data      Json               @default("{}")
+  isRead    Boolean            @default(false) @map("is_read")
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+enum GameStatus {
+  WAITING
+  STARTING
+  IN_PROGRESS
+  FINISHED
+  CANCELLED
+}
+
+enum MessageType {
+  CHAT
+  SYSTEM
+  GAME_EVENT
+  PRIVATE
+  ANNOUNCEMENT
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  BLOCKED
+}
+
+enum NotificationType {
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  GAME_INVITE
+  GAME_STARTING
+  YOUR_TURN
+  GAME_ENDED
+  ACHIEVEMENT
+  SYSTEM
+}

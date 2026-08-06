@@ -1,0 +1,24 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.authRouter = void 0;
+const express_1 = require("express");
+const auth_1 = require("../middleware/auth");
+const validation_1 = require("../middleware/validation");
+const auth_controller_1 = require("../controllers/auth.controller");
+const validators_1 = require("../validators");
+exports.authRouter = (0, express_1.Router)();
+exports.authRouter.post('/register', (0, validation_1.validate)(validators_1.registerSchema), auth_controller_1.register);
+exports.authRouter.post('/login', (0, validation_1.validate)(validators_1.loginSchema), auth_controller_1.login);
+exports.authRouter.post('/refresh', (0, validation_1.validate)(validators_1.refreshTokenSchema), auth_controller_1.refresh);
+exports.authRouter.post('/logout', auth_1.authenticate, auth_controller_1.logout);
+exports.authRouter.post('/logout-all', auth_1.authenticate, auth_controller_1.logoutAll);
+exports.authRouter.post('/change-password', auth_1.authenticate, (0, validation_1.validate)(validators_1.changePasswordSchema), auth_controller_1.changePassword);
+exports.authRouter.post('/forgot-password', (0, validation_1.validate)(validators_1.forgotPasswordSchema), auth_controller_1.forgotPassword);
+exports.authRouter.post('/reset-password', (0, validation_1.validate)(validators_1.resetPasswordSchema), auth_controller_1.resetPassword);
+exports.authRouter.post('/2fa/enable', auth_1.authenticate, auth_controller_1.enable2FA);
+exports.authRouter.post('/2fa/verify', auth_1.authenticate, (0, validation_1.validate)(validators_1.twoFactorSchema), auth_controller_1.verify2FA);
+exports.authRouter.post('/2fa/disable', auth_1.authenticate, (0, validation_1.validate)(validators_1.twoFactorSchema), auth_controller_1.disable2FA);
+exports.authRouter.get('/profile', auth_1.authenticate, auth_controller_1.getProfile);
+exports.authRouter.put('/profile', auth_1.authenticate, (0, validation_1.validate)(validators_1.updateProfileSchema), auth_controller_1.updateProfile);
+exports.authRouter.delete('/account', auth_1.authenticate, auth_controller_1.deleteAccount);
+//# sourceMappingURL=auth.routes.js.map
