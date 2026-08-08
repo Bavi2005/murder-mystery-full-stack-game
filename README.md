@@ -115,6 +115,22 @@ Health check:        http://localhost:3001/health
 Unit tests live alongside the code (`*.test.ts`) under `backend/src` and `frontend/src`.
 Run them with `npm test` in the relevant directory.
 
+## Looks of the game
+
+main page
+<img width="765" height="921" alt="image" src="https://github.com/user-attachments/assets/8e70742b-f0e4-4f60-9787-5e1e855d6876" />
+
+
+dashboard/games available and room creation
+<img width="1115" height="930" alt="image" src="https://github.com/user-attachments/assets/8da3dde4-01b7-4016-8c40-0695bb96eb00" />
+
+login
+<img width="508" height="680" alt="image" src="https://github.com/user-attachments/assets/6128466b-2f2d-4f06-9831-f22369f4ef31" />
+
+
+
 ## License
+
+
 
 For educational purposes (42 school project).# murder-mystery-full-stack-game
