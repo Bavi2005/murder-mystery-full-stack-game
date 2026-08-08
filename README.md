@@ -4,6 +4,9 @@ A full-stack, real-time multiplayer murder mystery game built for the 42 `ft_tra
 
 Players join live rooms, move around a mansion board, gather clues, vote, and accuse the murderer in a clue-like social deduction game.
 
+<img width="1167" height="926" alt="image" src="https://github.com/user-attachments/assets/a1713442-50a1-4b41-ac4a-9b89c8236d1b" />
+
+
 ## Tech Stack
 
 | Layer     | Technology |
